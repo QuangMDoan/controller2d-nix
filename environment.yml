@@ -1,0 +1,9 @@
+name: controller2d
+channels:
+  - conda-forge
+  - cogsci
+  - fastai
+  - nodefaults
+dependencies:
+  - python==3.6
+  
