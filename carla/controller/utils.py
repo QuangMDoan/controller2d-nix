@@ -1,13 +1,12 @@
 import numpy as np
-
 from math import pi
 from numpy import linalg as LA
+import csv
 
-
-def project_point(vector, point):
-    """Given a line vector and a point, projects the point
+def project_point(vector, x):
+    """Given a line vector and a point x, projects the point
     on the line, resulting to a point that is closest to
-    the given point.
+    the given point x.
 
     Args:
         vector: A 2D array of points in the form [[x1, y1], [x2, y2]]
@@ -18,23 +17,22 @@ def project_point(vector, point):
             given vector.
     """
 
-    p0 = vector[0]
-    p1 = vector[1]
+    v1 = vector[0]
+    v2 = vector[1]
+    w = np.subtract(v2, v1)
+    x_prime = np.subtract(x, v1)
+    
+    # scalar / distance 
+    c = np.dot(x_prime, w) / np.dot(w, w)
 
-    v1 = np.subtract(point, p0)
-    v2 = np.subtract(p1, p0)
-
-    distance = np.dot(v1, v2) / np.power(LA.norm(v2), 2)
-
-    if distance < 0.0:
-        closest_point = p0
-    elif distance > 1.0:
-        closest_point = p1
-    else:
-        closest_point = p0 + distance * v2
+    if  c < 0.0:
+        closest_point = v1
+    elif c > 1.0:
+        closest_point = v2
+    else:        
+        closest_point = v1 + c * w 
 
     return closest_point
-
 
 def next_carrot(vector, pose_2d, lookahead_dis):
     """Given a line vector, position and look-ahead distance,
@@ -50,28 +48,26 @@ def next_carrot(vector, pose_2d, lookahead_dis):
         carrot: A 2D point in the form [x, y].
     """
     p0 = vector[0]
-    p1 = vector[1]
-
-    projected_point = project_point(vector, pose_2d)
+    p1 = vector[1]    
+    x_projected = project_point(vector, pose_2d)
+    
+    # Calculate vector of trajectory
+    w = np.subtract(p1, p0)
 
     # Calculate unit vector of trajectory
-    vec_diff = np.subtract(p1, p0)
-    unit_vec = vec_diff / LA.norm(vec_diff)
-
-    carrot = projected_point + lookahead_dis * unit_vec
+    w_hat = w / LA.norm(w)
+    carrot = x_projected + lookahead_dis * w_hat
     return carrot
 
-
-def calculate_delta(position, carrot, delta_max):
-    """Given a 2D position and carrot pose, determine the steering
-    angle delta.
+def calculate_delta(pose_2d, carrot, delta_max):
+    """Given a 2D pose and carrot, determine the steering angle delta.
     This angle should be constrained by `delta_max`, determined based
     on the model. For instance for a car, this will depend on the properties
     of the car (for instance using Ackermann steering geometry you can
     calculate the center of the turning circle).
 
     Args:
-        position: A 2D array of points in the form [[x1, y1], [x2, y2]]
+        pose_2d: A 2D pose [x, y, theta]
         carrot: A 2D point in the form [x, y]
         delta_max: A float distance determining how far ahead we want to look.
 
@@ -79,11 +75,11 @@ def calculate_delta(position, carrot, delta_max):
         delta: A float representing the steering angle in unit radians.
     """
 
-    theta = position[2]
+    theta = pose_2d[2]
 
     # Calculate the angle between position and carrot
-    x = carrot[0] - position[0]
-    y = carrot[1] - position[1]
+    x = carrot[0] - pose_2d[0]
+    y = carrot[1] - pose_2d[1]
     angle_of_vec = np.arctan2(y, x)
 
     # Limit delta to pi and -pi
@@ -97,7 +93,6 @@ def calculate_delta(position, carrot, delta_max):
         delta = -delta_max
 
     return delta
-
 
 def update_waypoint_trajectory(waypoints, waypoint_counter):
     """Given a list of waypoints, and waypoint_counter, determine
@@ -133,7 +128,6 @@ def update_waypoint_trajectory(waypoints, waypoint_counter):
 
     return wp1, wp2, update_trajectory
 
-
 def calculate_distance(point1, point2):
     """Given two 2D points, calculate the distance.
 
@@ -146,6 +140,25 @@ def calculate_distance(point1, point2):
             the points.
     """
 
-    distance = np.sqrt(np.power((point2[1] - point1[1]), 2) +
-                       np.power((point2[0] - point1[0]), 2))
-    return distance
+    return LA.norm(np.subtract([point2[0], point2[1]], [point1[0], point1[1]]))
+
+def find_closest_point(waypoints, pose):    
+    closest_index = 0
+    closest_distance = calculate_distance(waypoints[closest_index], pose)
+
+    for i in range(1, len(waypoints)):
+        current_dist = calculate_distance(waypoints[i], pose)
+        if current_dist < closest_distance:            
+            closest_index = i
+            closest_distance = current_dist
+    
+    return closest_index, closest_distance
+
+def read_waypoints(waypoints_file):
+    waypoints_np   = None
+    with open(waypoints_file) as waypoints_file_handle:
+        waypoints = list(csv.reader(waypoints_file_handle, 
+                                delimiter=',',
+                                quoting=csv.QUOTE_NONNUMERIC))
+    waypoints_np = np.array(waypoints)
+    return waypoints_np

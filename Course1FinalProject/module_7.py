@@ -306,13 +306,9 @@ def exec_waypoint_nav_demo(args):
         # Can you spot these during the simulation? If so, how can you further
         # reduce these effects?
         
-        # Linear interpolation computations
+        # Linear interpolation computations        
         # Compute a list of distances between waypoints
-        wp_distance = []   # distance array
-        for i in range(1, waypoints_np.shape[0]):
-            wp_distance.append(
-                    np.sqrt((waypoints_np[i, 0] - waypoints_np[i-1, 0])**2 +
-                            (waypoints_np[i, 1] - waypoints_np[i-1, 1])**2))
+        wp_distance = [utils.calculate_distance(waypoints_np[i-1], waypoints_np[i]) for i in range(1, waypoints_np.shape[0])]
         wp_distance.append(0)  # last distance is 0 because it is the distance
                                # from the last waypoint to the last waypoint
 
@@ -333,8 +329,8 @@ def exec_waypoint_nav_demo(args):
             # points to interpolate based on the desired resolution and
             # incrementally add interpolated points until the next waypoint
             # is about to be reached.
-            num_pts_to_interp = int(np.floor(wp_distance[i] /\
-                                         float(INTERP_DISTANCE_RES)) - 1)
+            num_pts_to_interp = int(np.floor(wp_distance[i] / float(INTERP_DISTANCE_RES)) - 1)
+
             wp_vector = waypoints_np[i+1] - waypoints_np[i]
             wp_uvector = wp_vector / np.linalg.norm(wp_vector)
             for j in range(num_pts_to_interp):
@@ -505,8 +501,7 @@ def exec_waypoint_nav_demo(args):
             measurement_data, sensor_data = client.read_data()
 
             # Update pose, timestamp
-            current_x, current_y, current_yaw = \
-                get_current_pose(measurement_data)
+            current_x, current_y, current_yaw = get_current_pose(measurement_data)
             current_speed = measurement_data.player_measurements.forward_speed
             current_timestamp = float(measurement_data.game_timestamp) / 1000.0
 
@@ -540,9 +535,7 @@ def exec_waypoint_nav_demo(args):
             # the car will always break out of instability points where there
             # are two indices with the same minimum distance, as in the
             # center of a circle)
-            closest_distance = np.linalg.norm(np.array([
-                    waypoints_np[closest_index, 0] - current_x,
-                    waypoints_np[closest_index, 1] - current_y]))
+            closest_distance = utils.calculate_distance(waypoints_np[closest_index], [current_x, current_y])
             new_distance = closest_distance
             new_index = closest_index
             while new_distance <= closest_distance:
@@ -551,9 +544,7 @@ def exec_waypoint_nav_demo(args):
                 new_index += 1
                 if new_index >= waypoints_np.shape[0]:  # End of path
                     break
-                new_distance = np.linalg.norm(np.array([
-                        waypoints_np[new_index, 0] - current_x,
-                        waypoints_np[new_index, 1] - current_y]))
+                new_distance = utils.calculate_distance(waypoints_np[new_index], [current_x, current_y])
             new_distance = closest_distance
             new_index = closest_index
             while new_distance <= closest_distance:
@@ -562,17 +553,13 @@ def exec_waypoint_nav_demo(args):
                 new_index -= 1
                 if new_index < 0:  # Beginning of path
                     break
-                new_distance = np.linalg.norm(np.array([
-                        waypoints_np[new_index, 0] - current_x,
-                        waypoints_np[new_index, 1] - current_y]))
+                new_distance = utils.calculate_distance(waypoints_np[new_index], [current_x, current_y])
 
             # Once the closest index is found, return the path that has 1
             # waypoint behind and X waypoints ahead, where X is the index
             # that has a lookahead distance specified by 
             # INTERP_LOOKAHEAD_DISTANCE
-            waypoint_subset_first_index = closest_index - 1
-            if waypoint_subset_first_index < 0:
-                waypoint_subset_first_index = 0
+            waypoint_subset_first_index = closest_index - 1 if closest_index > 1 else 0
 
             waypoint_subset_last_index = closest_index
             total_distance_ahead = 0
@@ -596,7 +583,7 @@ def exec_waypoint_nav_demo(args):
             controller.update_values(current_x, current_y, current_yaw, 
                                      current_speed,
                                      current_timestamp, frame)
-            controller.update_controls()
+            controller.update_controls()            
             cmd_throttle, cmd_steer, cmd_brake = controller.get_commands()
 
             # Skip the first frame (so the controller has proper outputs)
@@ -645,15 +632,19 @@ def exec_waypoint_nav_demo(args):
             # Find if reached the end of waypoint. If the car is within
             # DIST_THRESHOLD_TO_LAST_WAYPOINT to the last waypoint,
             # the simulation will end.
-            dist_to_last_waypoint = np.linalg.norm(np.array([
-                waypoints[-1][0] - current_x,
-                waypoints[-1][1] - current_y]))
+            dist_to_last_waypoint = utils.calculate_distance(waypoints[-1], [current_x, current_y])
             if  dist_to_last_waypoint < DIST_THRESHOLD_TO_LAST_WAYPOINT:
                 reached_the_end = True
             if reached_the_end:
                 break
+            
+            # DEBUG_FRAME = 1001
+            # if DEBUG_FRAME == frame:
+            #     break
 
-        # End of demo - Stop vehicle and Store outputs to the controller output
+        pid_terms_hist = controller.get_history()
+   
+        # End of demo - Stop vehicle and store outputs to the controller output
         # directory.
         if reached_the_end:
             print("Reached the end of path. Writing to controller_output...")
@@ -668,6 +659,22 @@ def exec_waypoint_nav_demo(args):
         store_trajectory_plot(brake_fig.fig, 'brake_output.png')
         store_trajectory_plot(steer_fig.fig, 'steer_output.png')
         write_trajectory_file(x_history, y_history, speed_history, time_history)
+
+        write_debug_file(pid_terms_hist)
+
+def write_debug_file(pid_terms_hist):
+    pid_terms_hist_file_name = os.path.join(CONTROLLER_OUTPUT_FOLDER, 'pid_terms_history.txt')
+
+    with open(pid_terms_hist_file_name, 'w') as pid_terms_hist_file: 
+        for i in range(len(pid_terms_hist)):
+            pid_terms_hist_file.write('%3.3f, %3.3f, %3.4f, %6.4f, %3.4f %3.4f, %3.4f \n' %\
+                                  (pid_terms_hist[i][0],  # v_desired: the speed we want
+                                   pid_terms_hist[i][1],  # v: the current speed carla has 
+                                   pid_terms_hist[i][2],  # error term: velocity_error
+                                   pid_terms_hist[i][3],  # the integral term: velocity_error_integral 
+                                   pid_terms_hist[i][4],  # error_derivative
+                                   pid_terms_hist[i][5],  # x_dotdot
+                                   pid_terms_hist[i][6])) # throttle_output = tanh(x_dotdot)
 
 def main():
     """Main function.

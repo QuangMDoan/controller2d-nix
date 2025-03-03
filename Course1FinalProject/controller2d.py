@@ -3,9 +3,16 @@
 """
 2D Controller Class to be used for the CARLA waypoint follower demo.
 """
-
+import sys
+import os
 import cutils
 import numpy as np
+
+# Script level imports
+# for accessing util functions in ./../carla/controller/utils.py
+
+sys.path.append(os.path.abspath(sys.path[0] + '/..'))
+from carla.controller import utils
 
 class Controller2D(object):
     def __init__(self, waypoints):
@@ -38,19 +45,9 @@ class Controller2D(object):
 
     def update_desired_speed(self):
         min_idx       = 0
-        min_dist      = float("inf")
         desired_speed = 0
-        for i in range(len(self._waypoints)):
-            dist = np.linalg.norm(np.array([
-                    self._waypoints[i][0] - self._current_x,
-                    self._waypoints[i][1] - self._current_y]))
-            if dist < min_dist:
-                min_dist = dist
-                min_idx = i
-        if min_idx < len(self._waypoints)-1:
-            desired_speed = self._waypoints[min_idx][2]
-        else:
-            desired_speed = self._waypoints[-1][2]
+        min_idx, _ = utils.find_closest_point(self._waypoints, [self._current_x, self._current_y])
+        desired_speed = self._waypoints[min_idx][2]
         self._desired_speed = desired_speed
 
     def update_waypoints(self, new_waypoints):
@@ -77,10 +74,14 @@ class Controller2D(object):
         brake           = np.fmax(np.fmin(input_brake, 1.0), 0.0)
         self._set_brake = brake
 
+    def get_history(self):
+        return self.vars.pid_terms_history
+
     def update_controls(self):
         ######################################################
         # RETRIEVE SIMULATOR FEEDBACK
         ######################################################
+        # current robot/vehicle pose (x, y, yaw) 
         x               = self._current_x
         y               = self._current_y
         yaw             = self._current_yaw
@@ -104,17 +105,19 @@ class Controller2D(object):
             This means that the value can be stored for use in the next
             iteration of the control loop.
 
-            Example: Creation of 'v_previous', default value to be 0
-            self.vars.create_var('v_previous', 0.0)
+            Example: Creation of 've_prev', default value to be 0
+            self.vars.create_var('ve_prev', 0.0)
 
-            Example: Setting 'v_previous' to be 1.0
-            self.vars.v_previous = 1.0
+            Example: Setting 've_prev' to be 1.0
+            self.vars.ve_prev = 1.0
 
-            Example: Accessing the value from 'v_previous' to be used
-            throttle_output = 0.5 * self.vars.v_previous
+            Example: Accessing the value from 've_prev' to be used
+            throttle_output = 0.5 * self.vars.ve_prev
         """
-        self.vars.create_var('v_previous', 0.0)
-
+        self.vars.create_var('ve_prev', 0.0) # previous velocity error for PID control
+        self.vars.create_var('ve_integral_prev', 0.0) # accumulated velocity errors from time 0 to time t-1 
+        self.vars.create_var('pid_terms_history', [])
+        
         # Skip the first frame to store previous values properly
         if self._start_control_loop:
             """
@@ -152,12 +155,13 @@ class Controller2D(object):
             ######################################################
             ######################################################
             # MODULE 7: IMPLEMENTATION OF LONGITUDINAL CONTROLLER HERE
+            # https://drive.google.com/file/d/14X4L41lthW6HZRXBn6ENHGUyQCJbCQsn/view?usp=sharing
             ######################################################
             ######################################################
             """
                 Implement a longitudinal controller here. Remember that you can
                 access the persistent variables declared above here. For
-                example, can treat self.vars.v_previous like a "global variable".
+                example, can treat self.vars.v_prev like a "global variable".
             """
             
             # Change these outputs with the longitudinal controller. Note that
@@ -165,27 +169,71 @@ class Controller2D(object):
             # assignment, as the car will naturally slow down over time.
             throttle_output = 0
             brake_output    = 0
+            
+            # Longitunal PID control            
+            kp = 2.5
+            ki = 0.006
+            kd = 0.2
 
+            # Remove dt because dt is a constant: dt = 0.033 for 30 fps
+            
+            # PID error term, velocity error ve
+            velocity_error = v_desired - v  
+
+            # PID I term
+            velocity_error_integral = self.vars.ve_integral_prev + velocity_error
+
+            # PID D term
+            error_derivative = velocity_error - self.vars.ve_prev
+
+            # acceleration x_dotdot is based on the difference between desired velocity (from preset waypoints) and current carla speed
+            x_dotdot = kp * velocity_error + ki * velocity_error_integral + kd * error_derivative
+
+            # use sigmoid function to bound the acceleration to [-1, 1] and use it as throttle_output
+            throttle_output = np.tanh(x_dotdot)
+            
+            self.vars.pid_terms_history.append([v_desired, v, velocity_error, velocity_error_integral, error_derivative, x_dotdot, throttle_output])
+            if throttle_output > 0:
+                throttle_output = throttle_output
+                brake_output    = 0
+            else:
+                brake_output    = -throttle_output
+                throttle_output = 0
+            
             ######################################################
             ######################################################
             # MODULE 7: IMPLEMENTATION OF LATERAL CONTROLLER HERE
+            # https://drive.google.com/file/d/1j6rJHBH3GFLkEpsuLau9tCMuAMcrthR2/view?usp=sharing
             ######################################################
             ######################################################
             """
                 Implement a lateral controller here. Remember that you can
                 access the persistent variables declared above here. For
-                example, can treat self.vars.v_previous like a "global variable".
+                example, can treat self.vars.v_prev like a "global variable".
             """
             
             # Change the steer output with the lateral controller. 
             steer_output    = 0
+            # Compute steering angle delta for pure pursuit controller
+            if len(waypoints) > 1:
+                robot_pose = [x, y, yaw]
+                waypt_counter, _ = utils.find_closest_point(waypoints, robot_pose)
+                waypoint_1, waypoint_2, update_trajectory = utils.update_waypoint_trajectory(waypoints, waypt_counter)
+                
+                # With the desired speed 22 m/s, and 30 fps, Carla drives 0.74 meters per frame 
+                # so we use 4 meters lookahead, and limiting the steering by 90 degrees
+                if update_trajectory:
+                    lookahead_distance = 4
+                    line_vec = [waypoint_1, waypoint_2]
+                    look_ahead_carrot = utils.next_carrot(line_vec, robot_pose, lookahead_distance)
+                    steer_output = utils.calculate_delta(robot_pose, look_ahead_carrot, np.radians(90))
 
             ######################################################
             # SET CONTROLS OUTPUT
             ######################################################
             self.set_throttle(throttle_output)  # in percent (0 to 1)
-            self.set_steer(steer_output)        # in rad (-1.22 to 1.22)
             self.set_brake(brake_output)        # in percent (0 to 1)
+            self.set_steer(steer_output)        # in rad (-1.22 to 1.22)
 
         ######################################################
         ######################################################
@@ -197,4 +245,6 @@ class Controller2D(object):
             current x, y, and yaw values here using persistent variables for use
             in the next iteration)
         """
-        self.vars.v_previous = v  # Store forward speed to be used in next step
+        # Store current values to be used in next step
+        self.vars.ve_prev = velocity_error 
+        self.vars.ve_integral_prev = velocity_error_integral
