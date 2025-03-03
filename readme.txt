@@ -57,3 +57,8 @@ Step 4 – Install required packages for Carla python client
         cd ~/CarlaSimulator/PythonClient/Course1FinalProject
         python module_7.py
 
+        ## Once Carla traveled through all racetrack waypoints or time is up 
+        ### We can assess the quality of the controller2d by running the grader below 
+
+        cd ~/CarlaSimulator/PythonClient/Course1FinalProject
+        python grade_c1m7.py racetrack_waypoints.txt controller_output/trajectory.txt
