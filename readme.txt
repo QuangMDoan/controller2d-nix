@@ -22,15 +22,7 @@ Step 4 – Install required packages for Carla python client
     cd ~/CarlaSimulator/PythonClient
     conda env create -f environment.yml
     conda activate controller2d
-
-    pip install Pillow>=3.1.2
-    pip install numpy>=1.14.5
-    pip install protobuf==3.6.0
-    pip install pygame>=1.9.4
-    pip matplotlib==2.2.2
-    pip install matplotlib==2.2.2
-    pip install future>=0.16.0
-    pip install scipy>=0.17.0
+    python -m pip install -r requirements.txt
 
     ## 1: Run autopilot to travel town 1 
 
