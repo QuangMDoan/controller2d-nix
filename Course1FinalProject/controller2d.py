@@ -181,7 +181,7 @@ class Controller2D(object):
             velocity_error = v_desired - v  
 
             # PID I term
-            velocity_error_integral = self.vars.ve_integral_prev + velocity_error
+            velocity_error_integral = self.vars.ve_integral_prev + abs(velocity_error)
 
             # PID D term
             error_derivative = velocity_error - self.vars.ve_prev
