@@ -46,6 +46,14 @@ Step 4 – Install required packages for Carla python client
         ### autopilot demo works on March 2nd! ###
         ##########################################
 
-    ### 2: Other built-in towns and tracks in Carla
+    ### 2: Other built-in towns for demo in Carla
         # /Game/Maps/Town01
         # /Game/Maps/Town02
+
+    ### 3: Run hand-written controller implemented in controller2d.py
+        cd ~/CarlaSimulator
+        ./CarlaUE4.sh /Game/Maps/RaceTrack -windowed -carla-server -benchmark -fps=30
+
+        cd ~/CarlaSimulator/PythonClient/Course1FinalProject
+        python module_7.py
+
