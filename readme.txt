@@ -1,10 +1,12 @@
+Assumption: Carla is installed (untar) to ~/CarlaSimulator directory
+
 Step 0 – Prerequsities
     sudo apt install -y make build-essential git
 
 Step 1 – Install Carla for Ubuntu
-    - Download CARLA from https://drive.google.com/file/d/1OgYM1rog0E-37cyNa_6Lw4UuKp2Rn5f-/view?usp=drive_link
+    - Download CarlaUE4Ubuntu.tar.gz from https://drive.google.com/drive/folders/1P6rHxOeH2RBNOqA0q2R03WYrNUPysccx
     - Move CarlaUE4Ubuntu.tar.gz to home directory (~/)
-    tar -xzf CarlaUE4Ubuntu.tar.gz
+    - Run tar -xzf CarlaUE4Ubuntu.tar.gz
     
 Step 2 – Download and install miniconda for PythonClient
     mkdir -p ~/miniconda3
@@ -19,7 +21,12 @@ Step 2 – Download and install miniconda for PythonClient
 
 Step 4 – Install required packages for Carla python client
 
-    cd ~/CarlaSimulator/PythonClient
+    cd ~/CarlaSimulator
+    rm -rf ~/CarlaSimulator/PythonClient
+
+    cd ~/CarlaSimulator
+    git clone git@github.com:QuangMDoan/controller2d-nix.git PythonClient
+
     conda env create -f environment.yml
     conda activate controller2d
     python -m pip install -r requirements.txt
