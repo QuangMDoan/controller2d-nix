@@ -1,0 +1,10 @@
+$ conda env list
+$ python --version
+    Python 3.13.7
+$ conda create -n driving_course3
+$ conda activate driving_course3
+$ conda init zsh 
+$ conda install -c conda-forge opencv
+$ python -c "import cv2; print(cv2.__version__)"
+    4.12.0
+$ conda install -c conda-forge pyqt
