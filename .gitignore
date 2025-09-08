@@ -6,3 +6,4 @@ carla/planner/__pycache__/**
 carla/planner/__pycache__
 carla/planner/__pycache__/*
 carla/__pycache__/***
+**/.DS_Store
