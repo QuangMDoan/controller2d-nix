@@ -16,8 +16,7 @@ class DatasetHandler:
         root_dir_path = os.path.dirname(os.path.realpath(__file__))
         self.image_dir = os.path.join(root_dir_path, 'data/rgb')
         self.depth_dir = os.path.join(root_dir_path, 'data/depth')
-        self.segmentation_dir = os.path.join(
-            root_dir_path, 'data/segmentation')
+        self.segmentation_dir = os.path.join(root_dir_path, 'data/segmentation')
 
         # Set up initial iterator value
         self.current_frame = 0
