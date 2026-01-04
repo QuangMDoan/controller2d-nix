@@ -127,7 +127,7 @@ def visualize_trajectory(trajectory):
 
     # Set styles
     mpl.rc("figure", facecolor="white")
-    plt.style.use("seaborn-whitegrid")
+    # plt.style.use("seaborn-whitegrid")
 
     # Plot the figure
     fig = plt.figure(figsize=(8, 6), dpi=100)
