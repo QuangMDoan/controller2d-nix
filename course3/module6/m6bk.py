@@ -1,5 +1,4 @@
 import os
-
 import numpy as np
 import cv2
 
@@ -238,7 +237,6 @@ def compute_plane(xyz):
 
     Arguments:
     xyz -- tensor of dimension (3, N), contains points needed to fit plane.
-    k -- tensor of dimension (3x3), the intrinsic camera matrix
 
     Returns:
     p -- tensor of dimension (1, 4) containing the plane parameters a,b,c,d
@@ -251,9 +249,6 @@ def compute_plane(xyz):
     d = np.matmul(p, ctr)
 
     p = np.append(p, -d)
-
-    # Correct plane
-    # p = [0.0, 1.0, 0.0, -1.5]
     return p
 
 
@@ -308,3 +303,45 @@ def find_closest_lines(lines, point):
     sorted = distances.argsort()
 
     return lines[sorted[0:2], :]
+
+def plot_plane(a, b, c, d, N=0, ax=None, showing=True, xlim=(-10, 10), ylim=(-10, 10)):
+    """
+    Plots the plane: ax + by + cz + d = 0
+    """
+    if c == 0: raise ValueError("c cannot be zero")
+
+    x = np.linspace(*xlim, 20)
+    y = np.linspace(*ylim, 20)
+    X, Y = np.meshgrid(x, y)
+    Z = (-a * X - b * Y - d) / c
+
+    if ax is None:
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+
+    ax.plot_surface(X, Y, Z, alpha=0.6)
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+
+    points = None
+    
+    # Optional N Random points on plane
+    if N > 0:
+        xr = np.random.uniform(*xlim, N)
+        yr = np.random.uniform(*ylim, N)
+        zr = (-a * xr - b * yr - d) / c
+
+        points = np.stack([xr, yr, zr], axis=1)
+
+        # visualize points
+        ax.scatter(xr, yr, zr, color='r', s=50)
+
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    plt.show()
+
+    if showing: plt.show()
+
+    return points
