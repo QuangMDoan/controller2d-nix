@@ -157,7 +157,7 @@ class DatasetHandler:
 
         for obj in objects:
             category = obj[0]
-            bounding_box = np.asfarray(obj[1:5]).astype(int)
+            bounding_box = np.asarray(obj[1:5], dtype=float).astype(int)
 
             image_out = cv2.rectangle(image_out.astype(np.uint8),
                                       (bounding_box[0], bounding_box[1]),
@@ -172,8 +172,8 @@ class DatasetHandler:
             x1, y1, x2, y2 = line.astype(int)
 
             image_out = cv2.line(
-                image_out.astype(
-                    np.uint8), (x1, y1), (x2, y2), (255, 0, 255), 7)
+                image_out.astype(np.uint8), 
+                (x1, y1), (x2, y2), (255, 0, 255), 7)
 
         return image_out
 
