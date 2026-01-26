@@ -231,26 +231,37 @@ class DatasetHandler:
         plt.show()
 
 
-def compute_plane(xyz):
+def compute_plane(P):
     """
     Computes plane coefficients a,b,c,d of the plane in the form ax+by+cz+d = 0
 
     Arguments:
-    xyz -- tensor of dimension (3, N), contains points needed to fit plane.
+    P -- tensor of dimension (3, N), contains points needed to fit plane.
 
     Returns:
-    p -- tensor of dimension (1, 4) containing the plane parameters a,b,c,d
+    abcd -- tensor of dimension (1, 4) containing the plane parameters a,b,c,d
     """
-    ctr = xyz.mean(axis=1)
-    normalized = xyz - ctr[:, np.newaxis]
-    M = np.dot(normalized, normalized.T)
+    ctr = P.mean(axis=1)
+    Q = P - ctr[:, np.newaxis]
+    M = np.dot(Q, Q.T)
 
-    p = np.linalg.svd(M)[0][:, -1]
-    d = np.matmul(p, ctr)
+    # n = (a, b, c) is normal vector to the plane
+    n = np.linalg.svd(M)[0][:, -1]
+    d = -np.matmul(n, ctr) # ctr is on the plane
 
-    p = np.append(p, -d)
-    return p
+    abcd = np.append(n, d)
+    return abcd
 
+def compute_plane2(P):
+    ctr = P.mean(axis=1)
+    Q = P - ctr[:, np.newaxis]
+    
+    # n = (a, b, c) is normal vector to the plane
+    n = np.linalg.svd(Q)[0][:, -1]
+    d = -np.matmul(n, ctr) # ctr is on the plane
+
+    abcd = np.append(n, d)
+    return abcd
 
 def dist_to_plane(plane, x, y, z):
     """
